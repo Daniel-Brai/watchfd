@@ -10,8 +10,8 @@
 
 #include <libnotify/notify.h>
 
-#define EXIT_ERR_INVALID_ARGUMENT 1
-#define EXIT_ERR_INVALID_FILE_PATH 2
+#define EXIT_ERR_INVALID_ARGUMENT 65
+#define EXIT_ERR_INVALID_FILE_PATH 66
 
 const char *program = "watchfd";
 
