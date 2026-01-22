@@ -13,7 +13,6 @@
 #define EXIT_ERR_INVALID_ARGUMENT 1
 #define EXIT_ERR_INVALID_FILE_PATH 2
 
-
 const char *program = "watchfd";
 
 int main(int argc, char *argv[]) {
@@ -86,6 +85,8 @@ int main(int argc, char *argv[]) {
 
       watch_event = (const struct inotify_event *)ptr;
 
+      notification_msg = NULL;
+
       if (watch_event->mask & IN_CREATE)
         notification_msg = "File created\n";
       if (watch_event->mask & IN_DELETE)
@@ -115,7 +116,12 @@ int main(int argc, char *argv[]) {
       }
 
       g_object_unref(G_OBJECT(notifier));
-      notify_uninit();
     }
   }
+
+  close(ino_fd);
+  notify_uninit();
+  free(base_path);
+
+  return EXIT_SUCCESS;
 }
