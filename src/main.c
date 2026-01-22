@@ -15,6 +15,26 @@
 
 const char *program = "watchfd";
 
+int INO_FD = -1;
+int INO_STATUS = -1;
+
+void signal_handler(int signum, siginfo_t *info, void *context) {
+  printf("Received signal code %d, exiting...", info->si_code);
+
+  /* unlink the file path for inotify */
+  if (INO_FD != -1 && INO_STATUS != -1) {
+    if (inotify_rm_watch(INO_FD, INO_STATUS) == 1) {
+      fprintf(stderr, "Error removing watch for file");
+    };
+  }
+
+  if (INO_FD != 1) {
+    close(INO_FD);
+  }
+
+  exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char *argv[]) {
   char *base_path = NULL;
   char *token = NULL;
@@ -45,9 +65,9 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  int ino_fd = inotify_init();
+  INO_FD = inotify_init();
 
-  if (ino_fd == -1) {
+  if (INO_FD == -1) {
     fprintf(stderr, "Error initializing inotify instance\n");
     return EXIT_FAILURE;
   }
@@ -55,13 +75,28 @@ int main(int argc, char *argv[]) {
   const uint32_t ino_watch_msk = IN_CREATE | IN_DELETE | IN_ACCESS |
                                  IN_CLOSE_WRITE | IN_MODIFY | IN_MOVE_SELF;
 
-  int ino_watch = inotify_add_watch(ino_fd, argv[1], ino_watch_msk);
+  INO_STATUS = inotify_add_watch(INO_FD, argv[1], ino_watch_msk);
 
-  if (ino_watch == -1) {
+  if (INO_STATUS == -1) {
     fprintf(stderr, "Failed to watch file at %s. Error: %s", argv[1],
             strerror(errno));
 
     return EXIT_FAILURE;
+  }
+
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = signal_handler;
+  sa.sa_flags = SA_SIGINFO;
+
+  int signals[] = {SIGINT, SIGTERM, SIGABRT};
+  size_t nsignals = sizeof(signals) / sizeof(signals[0]);
+
+  for (size_t i = 0; i < nsignals; i++) {
+    if (sigaction(signals[i], &sa, NULL) == -1) {
+      perror("Error setting signal handler via sigaction");
+      return EXIT_FAILURE;
+    }
   }
 
   const struct inotify_event *watch_event;
@@ -73,7 +108,7 @@ int main(int argc, char *argv[]) {
   while (true) {
     printf("Watching file for events...\n");
 
-    buf_size = read(ino_fd, buf, sizeof(buf));
+    buf_size = read(INO_FD, buf, sizeof(buf));
 
     if (buf_size == -1) {
       fprintf(stderr, "Failed to read from inotify instance\n");
@@ -119,7 +154,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  close(ino_fd);
   notify_uninit();
   free(base_path);
 
