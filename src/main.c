@@ -23,7 +23,7 @@ void signal_handler(int signum, siginfo_t *info, void *context) {
 
   /* unlink the file path for inotify */
   if (INO_FD != -1 && INO_STATUS != -1) {
-    if (inotify_rm_watch(INO_FD, INO_STATUS) == 1) {
+    if (inotify_rm_watch(INO_FD, INO_STATUS) == -1) {
       fprintf(stderr, "Error removing watch for file");
     };
   }
